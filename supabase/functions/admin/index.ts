@@ -72,6 +72,12 @@ Deno.serve(async (req) => {
         const { count } = await db.from("profiles").select("id", { count: "exact", head: true });
         if ((count ?? 0) >= MAX_USERS) return reply({ error: "כבר יש שני משתמשים. מחקו אחד לפני שמוסיפים חדש." }, 409);
 
+        // הזמנה חד-פעמית ל-60 שניות; הטריגר בהרשמה מאשר אותה ומוחק
+        const inviteKey = `invite:${email}`;
+        const { error: invErr } = await db.from("app_config")
+          .upsert({ key: inviteKey, value: new Date(Date.now() + 60_000).toISOString() });
+        if (invErr) throw invErr;
+
         const { data, error } = await db.auth.admin.createUser({
           email,
           password,
@@ -80,6 +86,7 @@ Deno.serve(async (req) => {
           app_metadata: { created_by_admin: true },
         });
         if (error) {
+          await db.from("app_config").delete().eq("key", inviteKey);
           if (/already been registered|already registered|exists/i.test(error.message)) {
             return reply({ error: "האימייל הזה כבר רשום" }, 409);
           }

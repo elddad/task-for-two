@@ -88,6 +88,7 @@ function friendlyError(err) {
   const m = err?.message || String(err);
   if (/SIGNUP_CLOSED/i.test(m)) return "רק המנהל יכול ליצור חשבונות.";
   if (/APP_FULL/i.test(m)) return "האפליקציה כבר מלאה – יש בה שני משתמשים.";
+  if (/Database error creating new user/i.test(m)) return "יצירת החשבון נכשלה (שגיאת מסד נתונים).";
   if (/Database error saving new user|Signups not allowed/i.test(m)) return "אי אפשר להירשם. רק המנהל יוצר חשבונות.";
   if (/Invalid login credentials/i.test(m)) return "אימייל או סיסמה לא נכונים.";
   if (/already registered/i.test(m)) return "האימייל הזה כבר רשום. נסו להתחבר.";
