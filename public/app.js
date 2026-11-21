@@ -81,12 +81,14 @@ function toast(msg) {
   toastTimer = setTimeout(() => (t.hidden = true), 2600);
 }
 
-const nameOf = (id) => (id === state.me?.id ? "אני" : state.profiles.find((p) => p.id === id)?.display_name ?? "?");
+const nameOf = (id) => (id === state.me?.id ? "אני" : state.profiles.find((p) => p.id === id)?.display_name ?? "משתמש שנמחק");
 const otherName = () => state.other?.display_name ?? "השני";
 
 function friendlyError(err) {
   const m = err?.message || String(err);
-  if (/APP_FULL|Database error saving new user/i.test(m)) return "האפליקציה כבר מלאה – יש בה שני משתמשים.";
+  if (/SIGNUP_CLOSED/i.test(m)) return "רק המנהל יכול ליצור חשבונות.";
+  if (/APP_FULL/i.test(m)) return "האפליקציה כבר מלאה – יש בה שני משתמשים.";
+  if (/Database error saving new user|Signups not allowed/i.test(m)) return "אי אפשר להירשם. רק המנהל יוצר חשבונות.";
   if (/Invalid login credentials/i.test(m)) return "אימייל או סיסמה לא נכונים.";
   if (/already registered/i.test(m)) return "האימייל הזה כבר רשום. נסו להתחבר.";
   if (/Email not confirmed/i.test(m)) return "צריך לאשר את האימייל (בדקו את תיבת הדואר).";
@@ -103,11 +105,18 @@ function setAuthMode(signup) {
   $("#name-row").hidden = !signup;
   $("#auth-form [name=display_name]").required = signup;
   $("#auth-form [name=password]").autocomplete = signup ? "new-password" : "current-password";
-  $("#auth-submit").textContent = signup ? "הרשמה" : "כניסה";
-  $("#auth-toggle").textContent = signup ? "כבר יש חשבון? כניסה" : "אין לך חשבון? הרשמה";
+  $("#auth-submit").textContent = signup ? "יצירת חשבון מנהל" : "כניסה";
+  $("#auth-toggle").textContent = signup ? "חזרה לכניסה" : "הגדרה ראשונה: יצירת חשבון מנהל";
   $("#auth-error").hidden = true;
 }
 $("#auth-toggle").addEventListener("click", () => setAuthMode(!signupMode));
+
+// הרשמה פתוחה רק פעם אחת: למנהל, לפני שיש לו חשבון. את כל השאר המנהל יוצר בפאנל.
+async function checkAdminSetup() {
+  const { data } = await sb.rpc("admin_setup_open");
+  $("#auth-toggle").hidden = data !== true;
+  $("#auth-note").hidden = data === true;
+}
 
 $("#auth-form").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -157,6 +166,7 @@ sb.auth.onAuthStateChange((_event, session) => {
     $("#app").hidden = true;
     $("#auth").hidden = false;
     setAuthMode(false);
+    checkAdminSetup();
   }
 });
 
@@ -175,7 +185,7 @@ async function startApp(user) {
 
 async function loadAll() {
   const [p, t, e] = await Promise.all([
-    sb.from("profiles").select("id, display_name"),
+    sb.from("profiles").select("id, display_name, is_admin"),
     sb.from("tasks").select("*, task_assignees(user_id, done_at)").order("created_at", { ascending: false }),
     sb.from("exams").select("*").order("exam_date").order("exam_time", { nullsFirst: true }),
   ]);
@@ -675,9 +685,191 @@ function renderSettings() {
   if (document.activeElement !== nameInput) nameInput.value = state.me.display_name ?? "";
   $("#partner-line").textContent = state.other
     ? `משתפים עם: ${state.other.display_name}`
-    : "השני עוד לא נרשם. שלחו לו/ה את הקישור לאתר כדי שיירשם/תירשם.";
+    : state.me.is_admin
+      ? "עוד אין משתמש שני. הוסיפו אותו בפאנל הניהול."
+      : "עוד אין משתמש שני.";
+  $("#admin-card").hidden = !state.me.is_admin;
   renderPushStatus();
 }
+
+// ================================================================ פאנל ניהול
+
+let adminUsers = [];
+let adminMax = 2;
+
+async function adminCall(action, payload = {}) {
+  const { data, error } = await sb.functions.invoke("admin", { body: { action, ...payload } });
+  if (error) {
+    let msg = error.message;
+    try { msg = (await error.context.json()).error || msg; } catch { /* נשאר הודעה כללית */ }
+    throw new Error(msg);
+  }
+  return data;
+}
+
+function genPassword() {
+  const chars = "abcdefghjkmnpqrstuvwxyz23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(10));
+  return [...bytes].map((b) => chars[b % chars.length]).join("");
+}
+
+$("#admin-open").addEventListener("click", () => {
+  $("#admin-dialog").showModal();
+  loadAdmin();
+});
+$("#admin-refresh").addEventListener("click", loadAdmin);
+$("#admin-gen-pass").addEventListener("click", () => { $("#admin-add [name=password]").value = genPassword(); });
+
+async function loadAdmin() {
+  $("#admin-loading").hidden = false;
+  $("#admin-loading").textContent = "טוען…";
+  try {
+    const res = await adminCall("list");
+    adminUsers = res.users;
+    adminMax = res.max;
+    $("#admin-loading").hidden = true;
+  } catch (err) {
+    $("#admin-loading").textContent = friendlyError(err);
+  }
+  renderAdmin();
+}
+
+function renderAdmin() {
+  $("#admin-users-title").textContent = `משתמשים (${adminUsers.length}/${adminMax})`;
+  $("#admin-users").innerHTML = adminUsers.map((u) => {
+    const self = u.id === state.me.id;
+    const devices = u.devices.length
+      ? u.devices.map((d) => `
+          <li class="device">
+            <span>📱 ${esc(deviceName(d.user_agent))} · ${esc(fmtWhen(d.created_at))}</span>
+            <button class="link danger-text" data-act="device" data-id="${d.id}" type="button">הסרה</button>
+          </li>`).join("")
+      : `<li class="device muted">אין מכשיר עם התראות</li>`;
+    return `
+      <li class="card admin-user" data-id="${esc(u.id)}">
+        <div class="admin-user-head">
+          <strong>${esc(u.display_name ?? "—")}</strong>
+          ${u.is_admin ? `<span class="tag">מנהל</span>` : ""}
+          ${self ? `<span class="tag subtle">את/ה</span>` : ""}
+        </div>
+        <div class="muted small" dir="ltr">${esc(u.email)}</div>
+        <div class="muted small">כניסה אחרונה: ${u.last_sign_in_at ? esc(fmtWhen(u.last_sign_in_at)) : "עוד לא נכנס/ה"}</div>
+        <ul class="devices">${devices}</ul>
+        <div class="row wrap">
+          <button class="btn" data-act="rename" type="button">שינוי שם</button>
+          <button class="btn" data-act="password" type="button">סיסמה חדשה</button>
+          ${self ? "" : `<button class="btn danger-text" data-act="delete" type="button">מחיקה</button>`}
+        </div>
+      </li>`;
+  }).join("");
+
+  $("#admin-add").hidden = adminUsers.length >= adminMax;
+
+  const open = state.tasks.filter((t) => !t.completed_at).length;
+  const done = state.tasks.length - open;
+  const today = todayStr();
+  const pastExams = state.exams.filter((x) => x.exam_date < today).length;
+  $("#admin-stats").textContent =
+    `${open} משימות פתוחות · ${done} שבוצעו · ${state.exams.length - pastExams} מבחנים קרובים · ${pastExams} שעברו`;
+  $("#admin-clear-done").disabled = done === 0;
+  $("#admin-clear-exams").disabled = pastExams === 0;
+}
+
+function deviceName(ua = "") {
+  if (/iPhone/.test(ua)) return "iPhone";
+  if (/iPad|Macintosh.*Mobile/.test(ua)) return "iPad";
+  if (/Android/.test(ua)) return "Android";
+  if (/Windows/.test(ua)) return "Windows";
+  if (/Macintosh/.test(ua)) return "Mac";
+  return "מכשיר";
+}
+
+$("#admin-users").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const u = adminUsers.find((x) => x.id === btn.closest("[data-id]")?.dataset.id);
+  const act = btn.dataset.act;
+  btn.disabled = true;
+  try {
+    if (act === "rename") {
+      const name = prompt("שם חדש:", u.display_name ?? "")?.trim();
+      if (!name) return;
+      if (name.length > 40) throw new Error("השם ארוך מדי (עד 40 תווים)");
+      const { error } = await sb.from("profiles").update({ display_name: name }).eq("id", u.id);
+      if (error) throw error;
+      toast("השם עודכן");
+      await Promise.all([loadAdmin(), loadAll()]);
+    } else if (act === "password") {
+      const pass = prompt(`סיסמה חדשה ל-${u.display_name} (לפחות 6 תווים):`, genPassword());
+      if (pass === null) return;
+      await adminCall("reset_password", { user_id: u.id, password: pass });
+      toast("הסיסמה עודכנה. שלחו אותה לו/ה.");
+    } else if (act === "delete") {
+      const ok = confirm(
+        `למחוק את ${u.display_name} (${u.email})?\n\n` +
+        "• החשבון נמחק ואי אפשר לבטל.\n" +
+        "• משימות שמשויכות רק אליו/ה יימחקו, וגם מבחנים שלו/ה.\n" +
+        "• משימות משותפות ומשימות שהוא/היא יצר/ה בשבילך נשארות.");
+      if (!ok) return;
+      const res = await adminCall("delete", { user_id: u.id });
+      toast(res.tasks_removed ? `נמחק. הוסרו גם ${res.tasks_removed} משימות שלו/ה.` : "המשתמש נמחק");
+      await Promise.all([loadAdmin(), loadAll()]);
+    } else if (act === "device") {
+      if (!confirm("להסיר את המכשיר הזה? הוא יפסיק לקבל התראות עד שיפעילו אותן שוב.")) return;
+      const { error } = await sb.from("push_subscriptions").delete().eq("id", Number(btn.dataset.id));
+      if (error) throw error;
+      toast("המכשיר הוסר");
+      await loadAdmin();
+    }
+  } catch (err) {
+    toast(friendlyError(err));
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("#admin-add").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const btn = f.querySelector("[type=submit]");
+  btn.disabled = true;
+  $("#admin-add-error").hidden = true;
+  try {
+    await adminCall("create", {
+      display_name: f.elements.display_name.value.trim(),
+      email: f.elements.email.value.trim(),
+      password: f.elements.password.value,
+    });
+    toast("החשבון נוצר");
+    f.reset();
+    await Promise.all([loadAdmin(), loadAll()]);
+  } catch (err) {
+    showError("#admin-add-error", friendlyError(err));
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("#admin-clear-done").addEventListener("click", async () => {
+  const n = state.tasks.filter((t) => t.completed_at).length;
+  if (!confirm(`למחוק ${n} משימות שבוצעו? אי אפשר לבטל.`)) return;
+  const { error } = await sb.from("tasks").delete().not("completed_at", "is", null);
+  if (error) return toast(friendlyError(error));
+  toast("המשימות שבוצעו נמחקו");
+  await loadAll();
+  renderAdmin();
+});
+
+$("#admin-clear-exams").addEventListener("click", async () => {
+  const today = todayStr();
+  const n = state.exams.filter((x) => x.exam_date < today).length;
+  if (!confirm(`למחוק ${n} מבחנים שעברו? אי אפשר לבטל.`)) return;
+  const { error } = await sb.from("exams").delete().lt("exam_date", today);
+  if (error) return toast(friendlyError(error));
+  toast("המבחנים שעברו נמחקו");
+  await loadAll();
+  renderAdmin();
+});
 
 $("#name-form").addEventListener("submit", async (e) => {
   e.preventDefault();

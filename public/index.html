@@ -34,7 +34,8 @@
         <p class="error" id="auth-error" hidden></p>
         <button class="btn primary" type="submit" id="auth-submit">כניסה</button>
       </form>
-      <button class="link" id="auth-toggle" type="button">אין לך חשבון? הרשמה</button>
+      <button class="link" id="auth-toggle" type="button" hidden>הגדרה ראשונה: יצירת חשבון מנהל</button>
+      <p class="muted small" id="auth-note">אין לך חשבון? המנהל יוצר אותו בשבילך.</p>
     </div>
   </section>
 
@@ -95,6 +96,11 @@
           </form>
           <p class="muted small" id="partner-line"></p>
           <button class="btn danger-text" id="logout" type="button">יציאה</button>
+        </div>
+        <div class="card" id="admin-card" hidden>
+          <h2>ניהול</h2>
+          <p class="muted small">משתמשים, סיסמאות וניקוי תוכן. רק את/ה רואה את זה.</p>
+          <button class="btn primary" id="admin-open" type="button">⚙️ פאנל ניהול</button>
         </div>
         <div class="card muted small">
           <h2>מתי נשלחות התראות?</h2>
@@ -241,6 +247,49 @@
         <button type="button" class="btn danger-text full" id="exam-delete" hidden>מחיקת המבחן</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- פאנל ניהול (רק למנהל) -->
+  <dialog id="admin-dialog" class="sheet">
+    <form method="dialog">
+      <header class="sheet-head">
+        <button class="link" value="close" formnovalidate>סגירה</button>
+        <h2>פאנל ניהול</h2>
+        <button class="link" id="admin-refresh" type="button" title="רענון">↻</button>
+      </header>
+    </form>
+    <div class="sheet-body">
+      <section>
+        <h3 id="admin-users-title">משתמשים</h3>
+        <ul class="list" id="admin-users"></ul>
+        <p class="muted small" id="admin-loading">טוען…</p>
+      </section>
+
+      <form id="admin-add" class="admin-add" hidden>
+        <h3>הוספת משתמש</h3>
+        <label>שם<input name="display_name" maxlength="40" required autocomplete="off"></label>
+        <label>אימייל<input name="email" type="email" required dir="ltr" autocomplete="off"></label>
+        <label>סיסמה זמנית
+          <div class="row">
+            <input name="password" required minlength="6" dir="ltr" autocomplete="new-password">
+            <button class="btn" type="button" id="admin-gen-pass">יצירה</button>
+          </div>
+        </label>
+        <p class="muted small">שלחו לו/ה את האימייל והסיסמה. אפשר לשנות סיסמה בכל זמן מכאן.</p>
+        <p class="error" id="admin-add-error" hidden></p>
+        <button class="btn primary full" type="submit">יצירת חשבון</button>
+      </form>
+
+      <section>
+        <h3>תוכן</h3>
+        <p class="muted small" id="admin-stats"></p>
+        <div class="stack">
+          <button class="btn danger-text full" id="admin-clear-done" type="button">מחיקת כל המשימות שבוצעו</button>
+          <button class="btn danger-text full" id="admin-clear-exams" type="button">מחיקת מבחנים שעברו</button>
+        </div>
+        <p class="muted small">משימה או מבחן בודדים – פותחים אותם מהרשימה ולוחצים "מחיקה".</p>
+      </section>
+    </div>
   </dialog>
 
   <div id="toast" class="toast" hidden></div>
