@@ -2,6 +2,8 @@
 
 אפליקציה משותפת לשני אנשים: משימות ומבחנים, עם התראות לאייפון.
 
+**כתובת:** https://elddad.github.io/task-for-two/
+
 ## מה יש בה
 
 - **משימות** עם רמת דחיפות (נמוכה / רגילה / גבוהה / דחוף), תאריך תפוגה, תזכורת, ו"להציק אם לא בוצע אחרי X ימים".
@@ -40,7 +42,7 @@
    npx supabase link --project-ref <PROJECT_REF>
    npx supabase db push
    npm run vapid
-   npx supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=https://<כתובת האתר>
+   npx supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=https://elddad.github.io/task-for-two
    npm run functions:deploy
    ```
 5. המיגרציה `..._config.sql` שומרת במסד את כתובת הפונקציות (`https://<PROJECT_REF>.supabase.co/functions/v1`).
@@ -48,7 +50,7 @@
 
 ## התקנה באייפון
 
-1. פותחים את כתובת האתר ב-**Safari**.
+1. פותחים את https://elddad.github.io/task-for-two/ ב-**Safari**.
 2. כפתור **שיתוף** → **הוספה למסך הבית**.
 3. פותחים את האפליקציה מהאייקון, נרשמים/נכנסים.
 4. **הגדרות → הפעלת התראות** → מאשרים.
