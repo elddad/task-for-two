@@ -17,7 +17,8 @@ function Invoke-Sql([string]$sql) {
   $file = Join-Path $dir ("q-" + [guid]::NewGuid().ToString("N") + ".sql")
   try {
     [IO.File]::WriteAllText($file, $sql, [Text.UTF8Encoding]::new($false))
-    $out = npx supabase db query --linked --file $file 2>&1 | Out-String
+    # --output-format json: otherwise the CLI prints a table in a normal terminal
+    $out = npx supabase db query --linked --file $file --output-format json 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) { throw "Database error:`n$out" }
     return $out
   } finally {
