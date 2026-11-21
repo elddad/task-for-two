@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>משימות שלנו</title>
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="משימות">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- מסך התחברות -->
+  <section id="auth" class="auth" hidden>
+    <div class="auth-card">
+      <img src="icons/icon-192.png" alt="" class="auth-logo">
+      <h1>משימות שלנו</h1>
+      <p class="muted">משימות ומבחנים משותפים לשניים</p>
+      <form id="auth-form" autocomplete="on">
+        <label id="name-row" hidden>שם (מה שהשני יראה)
+          <input name="display_name" maxlength="40" autocomplete="nickname">
+        </label>
+        <label>אימייל
+          <input name="email" type="email" required autocomplete="email" dir="ltr">
+        </label>
+        <label>סיסמה
+          <input name="password" type="password" required minlength="6" autocomplete="current-password" dir="ltr">
+        </label>
+        <p class="error" id="auth-error" hidden></p>
+        <button class="btn primary" type="submit" id="auth-submit">כניסה</button>
+      </form>
+      <button class="link" id="auth-toggle" type="button">אין לך חשבון? הרשמה</button>
+    </div>
+  </section>
+
+  <!-- האפליקציה -->
+  <div id="app" hidden>
+    <header class="top">
+      <div>
+        <h1 id="page-title">משימות</h1>
+        <p class="muted small" id="subtitle"></p>
+      </div>
+      <button class="icon-btn" id="bell" type="button" title="התראות" hidden>🔕</button>
+    </header>
+
+    <main>
+      <!-- משימות -->
+      <section id="tab-tasks" class="tab">
+        <div class="chips" id="task-filters" role="tablist"></div>
+        <ul class="list" id="task-list"></ul>
+        <p class="empty" id="task-empty" hidden></p>
+      </section>
+
+      <!-- מבחנים -->
+      <section id="tab-exams" class="tab" hidden>
+        <ul class="list" id="exam-list"></ul>
+        <p class="empty" id="exam-empty" hidden>אין מבחנים קרובים 🎉</p>
+        <details class="past" id="past-exams" hidden>
+          <summary>מבחנים שעברו</summary>
+          <ul class="list" id="past-exam-list"></ul>
+        </details>
+      </section>
+
+      <!-- הגדרות -->
+      <section id="tab-settings" class="tab" hidden>
+        <div class="card">
+          <h2>התראות</h2>
+          <p id="push-status" class="muted"></p>
+          <div class="row">
+            <button class="btn primary" id="push-enable" type="button">הפעלת התראות</button>
+            <button class="btn" id="push-test" type="button" hidden>בדיקה</button>
+            <button class="btn danger-text" id="push-disable" type="button" hidden>כיבוי</button>
+          </div>
+          <div id="ios-help" class="help" hidden>
+            <strong>באייפון:</strong> ההתראות עובדות רק כשהאפליקציה מותקנת במסך הבית.
+            <ol>
+              <li>פתחו את האתר ב-<b>Safari</b></li>
+              <li>לחצו על כפתור <b>השיתוף</b> (ריבוע עם חץ למעלה)</li>
+              <li>בחרו <b>"הוספה למסך הבית"</b></li>
+              <li>פתחו את האפליקציה מהאייקון, ואז "הפעלת התראות"</li>
+            </ol>
+            צריך iOS 16.4 ומעלה.
+          </div>
+        </div>
+        <div class="card">
+          <h2>החשבון שלי</h2>
+          <form id="name-form" class="row">
+            <input name="display_name" maxlength="40" required>
+            <button class="btn" type="submit">שמירה</button>
+          </form>
+          <p class="muted small" id="partner-line"></p>
+          <button class="btn danger-text" id="logout" type="button">יציאה</button>
+        </div>
+        <div class="card muted small">
+          <h2>מתי נשלחות התראות?</h2>
+          <ul class="bullets">
+            <li>כשהשני מוסיף משימה או מבחן, או מסמן משימה כבוצעה</li>
+            <li>בזמן התזכורת שקבעתם למשימה</li>
+            <li>24 שעות לפני שמשימה פגה (ושעה לפני, אם היא גבוהה/דחופה)</li>
+            <li>כשמשימה פגה ולא בוצעה</li>
+            <li>כשמשימה לא בוצעה כמה ימים (לפי מה שהגדרתם, בין 9:00 ל-21:00)</li>
+            <li>בערב שלפני מבחן (20:00)</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <button class="fab" id="fab" type="button" aria-label="הוספה">+</button>
+
+    <nav class="tabbar">
+      <button data-tab="tasks" class="active" type="button"><span>✅</span>משימות</button>
+      <button data-tab="exams" type="button"><span>📚</span>מבחנים</button>
+      <button data-tab="settings" type="button"><span>⚙️</span>הגדרות</button>
+    </nav>
+  </div>
+
+  <!-- טופס משימה -->
+  <dialog id="task-dialog" class="sheet">
+    <form id="task-form" method="dialog">
+      <header class="sheet-head">
+        <button class="link" value="cancel" formnovalidate>ביטול</button>
+        <h2 id="task-dialog-title">משימה חדשה</h2>
+        <button class="link strong" id="task-save" value="save">שמירה</button>
+      </header>
+      <div class="sheet-body">
+        <input name="title" placeholder="מה צריך לעשות?" maxlength="200" required class="big-input">
+        <textarea name="notes" placeholder="פרטים (לא חובה)" rows="2" maxlength="2000"></textarea>
+
+        <fieldset>
+          <legend>דחיפות</legend>
+          <div class="seg" data-name="urgency">
+            <button type="button" data-value="low">🟢 נמוכה</button>
+            <button type="button" data-value="medium">🟡 רגילה</button>
+            <button type="button" data-value="high">🟠 גבוהה</button>
+            <button type="button" data-value="urgent">🔴 דחוף</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>מי מבצע?</legend>
+          <div class="seg wrap" data-name="assign" id="assign-seg"></div>
+          <p class="muted small" id="assign-help"></p>
+        </fieldset>
+
+        <fieldset>
+          <legend>🔁 משימה קבועה</legend>
+          <select name="repeat">
+            <option value="">לא חוזרת</option>
+            <option value="daily">כל יום</option>
+            <option value="interval">כל כמה ימים</option>
+            <option value="weekly">כל שבוע</option>
+            <option value="monthly">כל חודש</option>
+          </select>
+          <label class="row inline" id="repeat-every-row" hidden>כל
+            <input type="number" name="repeat_every" min="2" max="365" value="2" inputmode="numeric">
+            ימים
+          </label>
+          <div class="days" id="repeat-days" hidden>
+            <button type="button" data-day="0">א׳</button>
+            <button type="button" data-day="1">ב׳</button>
+            <button type="button" data-day="2">ג׳</button>
+            <button type="button" data-day="3">ד׳</button>
+            <button type="button" data-day="4">ה׳</button>
+            <button type="button" data-day="5">ו׳</button>
+            <button type="button" data-day="6">ש׳</button>
+          </div>
+          <p class="muted small" id="repeat-help" hidden></p>
+        </fieldset>
+
+        <fieldset>
+          <legend><span id="due-label">תאריך תפוגה</span> <span class="muted small" id="due-optional">(לא חובה)</span></legend>
+          <div class="row">
+            <input type="datetime-local" name="due_at">
+            <button type="button" class="link" data-clear="due_at">ניקוי</button>
+          </div>
+          <div class="quick" data-for="due_at">
+            <button type="button" data-preset="tonight">היום 23:59</button>
+            <button type="button" data-preset="tomorrow-eve">מחר בערב</button>
+            <button type="button" data-preset="week">בעוד שבוע</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>תזכורת <span class="muted small">(לא חובה)</span></legend>
+          <div class="row">
+            <input type="datetime-local" name="reminder_at">
+            <button type="button" class="link" data-clear="reminder_at">ניקוי</button>
+          </div>
+          <div class="quick" data-for="reminder_at">
+            <button type="button" data-preset="hour">בעוד שעה</button>
+            <button type="button" data-preset="evening">הערב 20:00</button>
+            <button type="button" data-preset="morning">מחר 08:00</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>להציק אם לא בוצע אחרי</legend>
+          <select name="stale_days">
+            <option value="">לא להציק</option>
+            <option value="1">יום</option>
+            <option value="2">יומיים</option>
+            <option value="3">3 ימים</option>
+            <option value="5">5 ימים</option>
+            <option value="7">שבוע</option>
+            <option value="14">שבועיים</option>
+          </select>
+        </fieldset>
+
+        <p class="error" id="task-error" hidden></p>
+        <button type="button" class="btn danger-text full" id="task-delete" hidden>מחיקת המשימה</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- טופס מבחן -->
+  <dialog id="exam-dialog" class="sheet">
+    <form id="exam-form" method="dialog">
+      <header class="sheet-head">
+        <button class="link" value="cancel" formnovalidate>ביטול</button>
+        <h2 id="exam-dialog-title">מבחן חדש</h2>
+        <button class="link strong" value="save">שמירה</button>
+      </header>
+      <div class="sheet-body">
+        <input name="subject" placeholder="מקצוע" maxlength="100" required class="big-input" list="subjects">
+        <datalist id="subjects"></datalist>
+        <div class="row two">
+          <label>תאריך<input type="date" name="exam_date" required></label>
+          <label>שעה <span class="muted small">(לא חובה)</span><input type="time" name="exam_time"></label>
+        </div>
+        <fieldset>
+          <legend>של מי המבחן?</legend>
+          <div class="seg" data-name="owner" id="owner-seg"></div>
+        </fieldset>
+        <textarea name="notes" placeholder="חומר למבחן, הערות (לא חובה)" rows="3" maxlength="1000"></textarea>
+        <p class="error" id="exam-error" hidden></p>
+        <button type="button" class="btn danger-text full" id="exam-delete" hidden>מחיקת המבחן</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

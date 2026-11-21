@@ -1,0 +1,18 @@
+{
+  "name": "task-for-two",
+  "version": "1.0.0",
+  "private": true,
+  "description": "משימות ומבחנים משותפים לשני אנשים, עם התראות לאייפון (PWA + Supabase)",
+  "type": "module",
+  "scripts": {
+    "serve": "node scripts/serve.mjs",
+    "icons": "node scripts/make-icons.mjs",
+    "vapid": "node scripts/gen-vapid.mjs",
+    "db:push": "supabase db push",
+    "functions:deploy": "supabase functions deploy notify --no-verify-jwt && supabase functions deploy cron-check --no-verify-jwt"
+  },
+  "devDependencies": {
+    "supabase": "^2.0.0",
+    "web-push": "^3.6.7"
+  }
+}
