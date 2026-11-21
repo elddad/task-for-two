@@ -476,8 +476,7 @@ function openTask(t) {
   f.reminder_at.value = toLocalInput(t?.reminder_at);
   f.stale_days.value = t ? (t.stale_days ?? "") : "3";
   // משימה קבועה
-  const kind = t?.repeat_kind ?? "";
-  f.repeat.value = kind === "daily" && t.repeat_every > 1 ? "interval" : kind;
+  f.repeat.value = repeatOptionOf(t);
   f.repeat_every.value = t?.repeat_every > 1 ? t.repeat_every : 2;
   setRepeatDays(t?.repeat_weekdays ?? []);
   updateRepeatUI(false);
@@ -495,11 +494,34 @@ function setRepeatDays(days) {
   for (const b of $$("#repeat-days button")) b.classList.toggle("on", days.includes(Number(b.dataset.day)));
 }
 
+// אפשרויות בתפריט -> מה נשמר במסד (repeat_kind + האם בוחרים "כל כמה")
+const REPEAT_OPTIONS = {
+  daily:    { kind: "daily" },
+  interval: { kind: "daily",   every: { unit: "ימים",   max: 365 } },
+  weekly:   { kind: "weekly" },
+  monthly:  { kind: "monthly" },
+  months:   { kind: "monthly", every: { unit: "חודשים", max: 24 } },
+  yearly:   { kind: "yearly" },
+  years:    { kind: "yearly",  every: { unit: "שנים",   max: 10 } },
+};
+
+/** איזו אפשרות בתפריט מתאימה למשימה שמורה */
+function repeatOptionOf(t) {
+  if (!t?.repeat_kind) return "";
+  const many = t.repeat_every > 1;
+  if (t.repeat_kind === "daily") return many ? "interval" : "daily";
+  if (t.repeat_kind === "monthly") return many ? "months" : "monthly";
+  if (t.repeat_kind === "yearly") return many ? "years" : "yearly";
+  return t.repeat_kind;
+}
+
 /** טקסט קצר לחוק החזרה, למשל "כל שבוע (א׳, ד׳)" */
 function repeatText(t) {
   if (!t.repeat_kind) return "";
-  if (t.repeat_kind === "daily") return t.repeat_every > 1 ? `כל ${t.repeat_every} ימים` : "כל יום";
-  if (t.repeat_kind === "monthly") return "כל חודש";
+  const n = t.repeat_every;
+  if (t.repeat_kind === "daily") return n > 1 ? `כל ${n} ימים` : "כל יום";
+  if (t.repeat_kind === "monthly") return n > 1 ? `כל ${n} חודשים` : "כל חודש";
+  if (t.repeat_kind === "yearly") return n > 1 ? `כל ${n} שנים` : "כל שנה";
   const days = (t.repeat_weekdays ?? []).slice().sort();
   return days.length ? `כל שבוע (${days.map((d) => DAY_NAMES[d]).join(", ")})` : "כל שבוע";
 }
@@ -507,7 +529,13 @@ function repeatText(t) {
 function updateRepeatUI(autofill) {
   const f = $("#task-form");
   const v = f.repeat.value;
-  $("#repeat-every-row").hidden = v !== "interval";
+  const every = REPEAT_OPTIONS[v]?.every;
+  $("#repeat-every-row").hidden = !every;
+  if (every) {
+    $("#repeat-unit").textContent = every.unit;
+    f.repeat_every.max = every.max;
+    if (Number(f.repeat_every.value) > every.max) f.repeat_every.value = every.max;
+  }
   $("#repeat-days").hidden = v !== "weekly";
   $("#due-label").textContent = v ? "תאריך יעד" : "תאריך תפוגה";
   $("#due-optional").textContent = v ? "(לפעם הראשונה)" : "(לא חובה)";
@@ -578,7 +606,8 @@ $("#task-form").addEventListener("submit", async (e) => {
   if (repeat === "weekly" && repeatDays().length === 0) {
     return showError("#task-error", "בחרו באילו ימים בשבוע המשימה חוזרת.");
   }
-  const every = repeat === "interval" ? Math.min(365, Math.max(2, Number(f.repeat_every.value) || 2)) : 1;
+  const opt = REPEAT_OPTIONS[repeat];
+  const every = opt?.every ? Math.min(opt.every.max, Math.max(2, Number(f.repeat_every.value) || 2)) : 1;
   const save = $("#task-save");
   save.disabled = true;
   const { data: id, error } = await sb.rpc("save_task", {
@@ -591,7 +620,7 @@ $("#task-form").addEventListener("submit", async (e) => {
     p_due_at: due,
     p_reminder_at: reminder,
     p_stale_days: f.stale_days.value ? Number(f.stale_days.value) : null,
-    p_repeat_kind: repeat === "interval" ? "daily" : (repeat || null),
+    p_repeat_kind: opt?.kind ?? null,
     p_repeat_every: every,
     p_repeat_weekdays: repeat === "weekly" ? repeatDays() : null,
   });

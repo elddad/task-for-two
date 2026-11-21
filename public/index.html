@@ -161,10 +161,13 @@
             <option value="interval">כל כמה ימים</option>
             <option value="weekly">כל שבוע</option>
             <option value="monthly">כל חודש</option>
+            <option value="months">כל כמה חודשים</option>
+            <option value="yearly">כל שנה</option>
+            <option value="years">כל כמה שנים</option>
           </select>
           <label class="row inline" id="repeat-every-row" hidden>כל
             <input type="number" name="repeat_every" min="2" max="365" value="2" inputmode="numeric">
-            ימים
+            <span id="repeat-unit">ימים</span>
           </label>
           <div class="days" id="repeat-days" hidden>
             <button type="button" data-day="0">א׳</button>
